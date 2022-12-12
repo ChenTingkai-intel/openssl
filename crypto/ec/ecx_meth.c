@@ -16,6 +16,7 @@
 #include "crypto/evp.h"
 #include "ec_local.h"
 #include "curve448/curve448_local.h"
+#include <cpu_cycles.h>
 
 #define X25519_BITS          253
 #define X25519_SECURITY_BITS 128
@@ -649,7 +650,27 @@ const EVP_PKEY_ASN1_METHOD ed448_asn1_meth = {
     ecx_get_pub_key,
 };
 
+#ifdef CYCLES_ENABLE
+static int tmp_pkey_ecx_keygen(EVP_PKEY_CTX *ctx, EVP_PKEY *pkey);
+
 static int pkey_ecx_keygen(EVP_PKEY_CTX *ctx, EVP_PKEY *pkey)
+{
+    int ret;
+
+    CYCLES_END_PRINTF("enter ecx_keygen");
+    CYCLES_SET_FLAG("KEYGEN");
+    CYCLES_START();
+    ret = tmp_pkey_ecx_keygen(ctx, pkey);
+    CYCLES_END_PRINTF("ecx_keygen complete");
+    CYCLES_START();
+
+    return ret;
+}
+
+static int tmp_pkey_ecx_keygen(EVP_PKEY_CTX *ctx, EVP_PKEY *pkey)
+#else
+static int pkey_ecx_keygen(EVP_PKEY_CTX *ctx, EVP_PKEY *pkey)
+#endif
 {
     return ecx_key_op(pkey, ctx->pmeth->pkey_id, NULL, NULL, 0, KEY_OP_KEYGEN);
 }

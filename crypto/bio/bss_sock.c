@@ -15,6 +15,7 @@
 #ifndef OPENSSL_NO_SOCK
 
 # include <openssl/bio.h>
+#include <cpu_cycles.h>
 
 # ifdef WATT32
 /* Watt-32 uses same names */
@@ -103,6 +104,9 @@ static int sock_read(BIO *b, char *out, int outl)
                 BIO_set_retry_read(b);
             else if (ret == 0)
                 b->flags |= BIO_FLAGS_IN_EOF;
+#ifdef CYCLES_ENABLE_STATE_MACHINE
+            CYCLES_END_PRINTF("sock_read == 0");
+#endif
         }
     }
     return ret;

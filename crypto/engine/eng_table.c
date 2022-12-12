@@ -11,6 +11,7 @@
 #include <openssl/evp.h>
 #include <openssl/lhash.h>
 #include "eng_local.h"
+#include <cpu_cycles.h>
 
 /* The type of the items in the table */
 struct st_engine_pile {
@@ -207,6 +208,9 @@ ENGINE *engine_table_select_tmp(ENGINE_TABLE **table, int nid, const char *f,
 #endif
         return NULL;
     }
+#ifdef CYCLES_ENABLE_STATE_MACHINE
+    CYCLES_START_ZONE(1);
+#endif
     ERR_set_mark();
     CRYPTO_THREAD_write_lock(global_engine_lock);
     /*
@@ -285,6 +289,9 @@ ENGINE *engine_table_select_tmp(ENGINE_TABLE **table, int nid, const char *f,
      * context, so clear our error state.
      */
     ERR_pop_to_mark();
+#ifdef CYCLES_ENABLE_STATE_MACHINE
+    CYCLES_END_ZONE_PRINTF(1, "engine_table_select");
+#endif
     return ret;
 }
 

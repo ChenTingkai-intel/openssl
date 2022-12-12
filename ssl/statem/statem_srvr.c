@@ -24,6 +24,61 @@
 #include <openssl/bn.h>
 #include <openssl/md5.h>
 #include <openssl/asn1t.h>
+#include <cpu_cycles.h>
+
+#ifdef CYCLES_ENABLE_STATE_MACHINE
+const char * handshake_state_func[50] = {
+    "TLS_ST_BEFORE",
+    "TLS_ST_OK",
+    "DTLS_ST_CR_HELLO_VERIFY_REQUEST",
+    "TLS_ST_CR_SRVR_HELLO",
+    "TLS_ST_CR_CERT",
+    "TLS_ST_CR_CERT_STATUS",
+    "TLS_ST_CR_KEY_EXCH",
+    "TLS_ST_CR_CERT_REQ",
+    "TLS_ST_CR_SRVR_DONE",
+    "TLS_ST_CR_SESSION_TICKET",
+    "TLS_ST_CR_CHANGE",
+    "TLS_ST_CR_FINISHED",
+    "TLS_ST_CW_CLNT_HELLO",
+    "TLS_ST_CW_CERT",
+    "TLS_ST_CW_KEY_EXCH",
+    "TLS_ST_CW_CERT_VRFY",
+    "TLS_ST_CW_CHANGE",
+    "TLS_ST_CW_NEXT_PROTO",
+    "TLS_ST_CW_FINISHED",
+    "TLS_ST_SW_HELLO_REQ",
+    "tls_process_client_hello",
+    "dtls_construct_hello_verify_request",
+    "tls_construct_server_hello",
+    "tls_construct_server_certificate",
+    "tls_construct_server_key_exchange",
+    "tls_construct_certificate_request",
+    "tls_construct_server_done",
+    "tls_process_client_certificate",
+    "tls_process_client_key_exchange",
+    "tls_process_cert_verify",
+    "tls_process_next_proto",
+    "tls_process_change_cipher_spec",
+    "tls_process_finished",
+    "tls_construct_new_session_ticket",
+    "tls_construct_cert_status",
+    "tls_construct_change_cipher_spec",
+    "tls_construct_finished",
+    "tls_construct_encrypted_extensions",
+    "TLS_ST_CR_ENCRYPTED_EXTENSIONS",
+    "TLS_ST_CR_CERT_VRFY",
+    "tls_construct_cert_verify",
+    "TLS_ST_CR_HELLO_REQ",
+    "tls_construct_key_update",
+    "TLS_ST_CW_KEY_UPDATE",
+    "tls_process_key_update",
+    "TLS_ST_CR_KEY_UPDATE",
+    "TLS_ST_EARLY_DATA",
+    "TLS_ST_PENDING_EARLY_DATA_END",
+    "TLS_ST_CW_END_OF_EARLY_DATA",
+    "tls_process_end_of_early_data"};
+#endif
 
 #define TICKET_NONCE_SIZE       8
 
@@ -644,6 +699,10 @@ WRITE_TRAN ossl_statem_server_write_transition(SSL *s)
         return WRITE_TRAN_CONTINUE;
 
     case TLS_ST_SW_SRVR_DONE:
+#ifdef CYCLES_ENABLE_STATE_MACHINE
+        CYCLES_END_PRINTF("server_done send complete");
+        CYCLES_SET_FLAG("handshake_server_done");
+#endif
         return WRITE_TRAN_FINISHED;
 
     case TLS_ST_SR_FINISHED:
@@ -937,8 +996,14 @@ WORK_STATE ossl_statem_server_post_work(SSL *s, WORK_STATE wst)
         break;
 
     case TLS_ST_SW_SRVR_DONE:
+#ifdef CYCLES_ENABLE_STATE_MACHINE
+        CYCLES_END_PRINTF("server done statem_flush start");
+#endif
         if (statem_flush(s) != 1)
             return WORK_MORE_A;
+#ifdef CYCLES_ENABLE_STATE_MACHINE
+        CYCLES_END_PRINTF("server done statem_flush complete");
+#endif
         break;
 
     case TLS_ST_SW_FINISHED:

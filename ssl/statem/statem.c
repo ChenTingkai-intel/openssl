@@ -12,6 +12,9 @@
 #include "../ssl_local.h"
 #include "statem_local.h"
 #include <assert.h>
+#ifdef CYCLES_ENABLE
+#include <cpu_cycles.h>
+#endif
 
 /*
  * This file implements the SSL/TLS/DTLS state machines.
@@ -546,6 +549,9 @@ static SUB_STATE_RETURN read_state_machine(SSL *s)
     WORK_STATE(*post_process_message) (SSL *s, WORK_STATE wst);
     size_t (*max_message_size) (SSL *s);
     void (*cb) (const SSL *ssl, int type, int val) = NULL;
+#ifdef CYCLES_ENABLE_STATE_MACHINE
+    const char *state_func_name = "NULL";
+#endif
 
     cb = get_callback(s);
 
@@ -576,6 +582,11 @@ static SUB_STATE_RETURN read_state_machine(SSL *s)
                  */
                 ret = dtls_get_message(s, &mt, &len);
             } else {
+#ifdef CYCLES_ENABLE_STATE_MACHINE
+                if (st->hand_state == TLS_ST_SW_SRVR_DONE) {
+                    CYCLES_END_PRINTF("server_done try to read");
+                }
+#endif
                 ret = tls_get_message_header(s, &mt);
             }
 
@@ -633,7 +644,18 @@ static SUB_STATE_RETURN read_state_machine(SSL *s)
                          ERR_R_INTERNAL_ERROR);
                 return SUB_STATE_ERROR;
             }
+#ifdef CYCLES_ENABLE_STATE_MACHINE
+            state_func_name = handshake_state_func[s->statem.hand_state];
+            CYCLES_SET_FLAG("process_func_start");
+            CYCLES_END_PRINTF_CONST(state_func_name);
+			CYCLES_SET_FLAG("handshake");
+#endif
             ret = process_message(s, &pkt);
+#ifdef CYCLES_ENABLE_STATE_MACHINE
+            CYCLES_SET_FLAG("process_func_complete");
+            CYCLES_END_PRINTF_CONST(state_func_name);
+			CYCLES_SET_FLAG("handshake");
+#endif
 
             /* Discard the packet data */
             s->init_num = 0;
@@ -765,6 +787,9 @@ static SUB_STATE_RETURN write_state_machine(SSL *s)
     int (*confunc) (SSL *s, WPACKET *pkt);
     int mt;
     WPACKET pkt;
+#ifdef CYCLES_ENABLE_STATE_MACHINE
+    volatile const char *state_func_name = "NULL";
+#endif
 
     cb = get_callback(s);
 
@@ -840,11 +865,26 @@ static SUB_STATE_RETURN write_state_machine(SSL *s)
                          ERR_R_INTERNAL_ERROR);
                 return SUB_STATE_ERROR;
             }
+#ifdef CYCLES_ENABLE_STATE_MACHINE
+            if (confunc != NULL) {
+                state_func_name = handshake_state_func[s->statem.hand_state];
+                CYCLES_SET_FLAG("confunc_start");
+                CYCLES_END_PRINTF_CONST(state_func_name);
+                CYCLES_SET_FLAG("handshake");
+            }
+#endif
             if (confunc != NULL && !confunc(s, &pkt)) {
                 WPACKET_cleanup(&pkt);
                 check_fatal(s, SSL_F_WRITE_STATE_MACHINE);
                 return SUB_STATE_ERROR;
             }
+#ifdef CYCLES_ENABLE_STATE_MACHINE
+            if (confunc != NULL) {
+                CYCLES_SET_FLAG("confunc_complete");
+                CYCLES_END_PRINTF_CONST(state_func_name);
+                CYCLES_SET_FLAG("handshake");
+            }
+#endif
             if (!ssl_close_construct_packet(s, &pkt, mt)
                     || !WPACKET_finish(&pkt)) {
                 WPACKET_cleanup(&pkt);

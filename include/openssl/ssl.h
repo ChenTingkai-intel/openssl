@@ -1041,6 +1041,10 @@ typedef enum {
     TLS_ST_SR_END_OF_EARLY_DATA
 } OSSL_HANDSHAKE_STATE;
 
+#ifdef CYCLES_ENABLE_STATE_MACHINE
+extern const char * handshake_state_func[50];
+#endif
+
 /*
  * Most of the following state values are no longer used and are defined to be
  * the closest equivalent value in the current state machine code. Not all

@@ -22,6 +22,7 @@
 #include <openssl/ct.h>
 #include "internal/cryptlib.h"
 #include "internal/refcount.h"
+#include <cpu_cycles.h>
 
 const char SSL_version_str[] = OPENSSL_VERSION_TEXT;
 
@@ -3703,6 +3704,9 @@ static int ssl_do_handshake_intern(void *vargs)
 
     args = (struct ssl_async_args *)vargs;
     s = args->s;
+#ifdef CYCLES_ENABLE_STATE_MACHINE
+    CYCLES_END_ZONE_PRINTF(3, "async job cost");
+#endif
 
     return s->handshake_func(s);
 }
@@ -3724,6 +3728,9 @@ int SSL_do_handshake(SSL *s)
         if ((s->mode & SSL_MODE_ASYNC) && ASYNC_get_current_job() == NULL) {
             struct ssl_async_args args;
 
+#ifdef CYCLES_ENABLE_STATE_MACHINE
+            CYCLES_START_ZONE(3);
+#endif
             memset(&args, 0, sizeof(args));
             args.s = s;
 

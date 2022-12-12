@@ -17,6 +17,7 @@
 #include <openssl/dh.h>
 #include <openssl/rand.h>
 #include "internal/cryptlib.h"
+#include <cpu_cycles.h>
 
 #define TLS13_NUM_CIPHERS       OSSL_NELEM(tls13_ciphers)
 #define SSL3_NUM_CIPHERS        OSSL_NELEM(ssl3_ciphers)
@@ -4847,6 +4848,9 @@ int ssl_derive(SSL *s, EVP_PKEY *privkey, EVP_PKEY *pubkey, int gensecret)
         pms = NULL;
         rv = 1;
     }
+#ifdef CYCLES_ENABLE_STATE_MACHINE
+   CYCLES_END_PRINTF("ssl_generate_master_secret");
+#endif
 
  err:
     OPENSSL_clear_free(pms, pmslen);

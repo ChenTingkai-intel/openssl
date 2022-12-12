@@ -13,10 +13,36 @@
 #include <openssl/rand.h>
 #include "crypto/bn.h"
 #include "ec_local.h"
+#include <cpu_cycles.h>
+
+#ifdef CYCLES_ENABLE
+int tmp_ossl_ecdsa_sign(int type, const unsigned char *dgst, int dlen,
+                    unsigned char *sig, unsigned int *siglen,
+                    const BIGNUM *kinv, const BIGNUM *r, EC_KEY *eckey);
 
 int ossl_ecdsa_sign(int type, const unsigned char *dgst, int dlen,
                     unsigned char *sig, unsigned int *siglen,
                     const BIGNUM *kinv, const BIGNUM *r, EC_KEY *eckey)
+{
+    int ret;
+
+    CYCLES_END_PRINTF("enter ecdsa_sign");
+    CYCLES_SET_FLAG("SIGN");
+    CYCLES_START();
+    ret = tmp_ossl_ecdsa_sign(type, dgst, dlen, sig, siglen, kinv, r, eckey);
+    CYCLES_END_PRINTF("ecdsa_sign complete");
+    CYCLES_START();
+    return ret;
+}
+
+int tmp_ossl_ecdsa_sign(int type, const unsigned char *dgst, int dlen,
+                    unsigned char *sig, unsigned int *siglen,
+                    const BIGNUM *kinv, const BIGNUM *r, EC_KEY *eckey)
+#else
+int ossl_ecdsa_sign(int type, const unsigned char *dgst, int dlen,
+                    unsigned char *sig, unsigned int *siglen,
+                    const BIGNUM *kinv, const BIGNUM *r, EC_KEY *eckey)
+#endif
 {
     ECDSA_SIG *s;
 
@@ -30,9 +56,33 @@ int ossl_ecdsa_sign(int type, const unsigned char *dgst, int dlen,
     return 1;
 }
 
+//#ifndef CYCLES_ENABLE
+//static int tmp_ecdsa_sign_setup(EC_KEY *eckey, BN_CTX *ctx_in,
+//                            BIGNUM **kinvp, BIGNUM **rp,
+//                            const unsigned char *dgst, int dlen);
+//static int ecdsa_sign_setup(EC_KEY *eckey, BN_CTX *ctx_in,
+//                            BIGNUM **kinvp, BIGNUM **rp,
+//                            const unsigned char *dgst, int dlen)
+//{
+//    int ret;
+//    CYCLES_END_PRINTF("enter ecdsa_sign_setup");
+//    CYCLES_SET_FLAG("SIGN");
+//    CYCLES_START();
+//    ret = tmp_ecdsa_sign_setup(eckey, ctx_in, kinvp, rp, dgst, dlen);
+//    CYCLES_END_PRINTF("ecdsa_sign_setup complete");
+//    CYCLES_START();
+//
+//    return ret;
+//}
+//
+//static int tmp_ecdsa_sign_setup(EC_KEY *eckey, BN_CTX *ctx_in,
+//                            BIGNUM **kinvp, BIGNUM **rp,
+//                            const unsigned char *dgst, int dlen)
+//#else
 static int ecdsa_sign_setup(EC_KEY *eckey, BN_CTX *ctx_in,
                             BIGNUM **kinvp, BIGNUM **rp,
                             const unsigned char *dgst, int dlen)
+//#endif
 {
     BN_CTX *ctx = NULL;
     BIGNUM *k = NULL, *r = NULL, *X = NULL;
@@ -151,9 +201,34 @@ int ossl_ecdsa_sign_setup(EC_KEY *eckey, BN_CTX *ctx_in, BIGNUM **kinvp,
     return ecdsa_sign_setup(eckey, ctx_in, kinvp, rp, NULL, 0);
 }
 
+//#ifndef CYCLES_ENABLE
+//ECDSA_SIG *tmp_ossl_ecdsa_sign_sig(const unsigned char *dgst, int dgst_len,
+//                               const BIGNUM *in_kinv, const BIGNUM *in_r,
+//                               EC_KEY *eckey);
+//ECDSA_SIG *ossl_ecdsa_sign_sig(const unsigned char *dgst, int dgst_len,
+//                               const BIGNUM *in_kinv, const BIGNUM *in_r,
+//                               EC_KEY *eckey)
+//{
+//    ECDSA_SIG *ret;
+//
+//    CYCLES_END_PRINTF("enter ecdsa_sign_sig");
+//    CYCLES_SET_FLAG("SIGN");
+//    CYCLES_START();
+//    ret = tmp_ossl_ecdsa_sign_sig(dgst, dgst_len, in_kinv, in_r, eckey);
+//    CYCLES_END_PRINTF("ecdsa_sign_sig complete");
+//    CYCLES_START();
+//
+//    return ret;
+//}
+//
+//ECDSA_SIG *tmp_ossl_ecdsa_sign_sig(const unsigned char *dgst, int dgst_len,
+//                               const BIGNUM *in_kinv, const BIGNUM *in_r,
+//                               EC_KEY *eckey)
+//#else
 ECDSA_SIG *ossl_ecdsa_sign_sig(const unsigned char *dgst, int dgst_len,
                                const BIGNUM *in_kinv, const BIGNUM *in_r,
                                EC_KEY *eckey)
+//#endif
 {
     int ok = 0, i;
     BIGNUM *kinv = NULL, *s, *m = NULL;

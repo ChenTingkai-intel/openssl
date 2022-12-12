@@ -15,6 +15,7 @@
 #include <openssl/err.h>
 #include <openssl/engine.h>
 #include "crypto/bn.h"
+#include <cpu_cycles.h>
 
 EC_KEY *EC_KEY_new(void)
 {
@@ -196,7 +197,73 @@ int ossl_ec_key_gen(EC_KEY *eckey)
     return eckey->group->meth->keygen(eckey);
 }
 
+#ifdef CYCLES_ENABLE
+int tmp_ec_key_simple_generate_key(EC_KEY *eckey);
+
 int ec_key_simple_generate_key(EC_KEY *eckey)
+{
+    int ret;
+#ifdef CYCLES_ENABLE_MB_KEYGEN
+    static int (*mb_ecdh_generate_key_func)(EC_KEY *ecdh) = NULL;
+    static int is_get_func = 0;
+    ENGINE *engine = NULL;
+    EC_KEY_METHOD *ec_key_meth = NULL;
+#endif
+
+again:
+#ifdef CYCLES_ENABLE_MB_KEYGEN
+    if (likely(mb_ecdh_generate_key_func != NULL)) {
+        ret = mb_ecdh_generate_key_func(eckey);
+        return ret;
+    }
+    if (unlikely(is_get_func == 0)) {
+        is_get_func++;
+        if ((engine = ENGINE_get_default_RSA()) && (ec_key_meth = ENGINE_get_EC(engine))) {
+             mb_ecdh_generate_key_func = ec_key_meth->keygen;;
+        }
+        goto again;
+    }
+#endif
+    CYCLES_END_PRINTF("enter keygen");
+    CYCLES_SET_FLAG("KEYGEN");
+    CYCLES_START();
+    ret = tmp_ec_key_simple_generate_key(eckey);
+    CYCLES_END_PRINTF("keygen complete");
+    CYCLES_START();
+    return ret;
+}
+
+int tmp_ec_key_simple_generate_key(EC_KEY *eckey)
+#else
+#ifdef MB_KEYGEN
+int tmp_ec_key_simple_generate_key(EC_KEY *eckey);
+
+int ec_key_simple_generate_key(EC_KEY *eckey)
+{
+    int ret;
+    static int (*mb_ecdh_generate_key_func)(EC_KEY *ecdh) = NULL;
+    static int is_get_func = 0;
+    ENGINE *engine = NULL;
+    EC_KEY_METHOD *ec_key_meth = NULL;
+
+again:
+    if (likely(mb_ecdh_generate_key_func != NULL)) {
+        return mb_ecdh_generate_key_func(eckey);
+    }
+    if (unlikely(is_get_func == 0)) {
+        is_get_func++;
+        if ((engine = ENGINE_get_default_RSA()) && (ec_key_meth = ENGINE_get_EC(engine))) {
+             mb_ecdh_generate_key_func = ec_key_meth->keygen;;
+        }
+        goto again;
+    }
+    return tmp_ec_key_simple_generate_key(eckey);
+}
+int tmp_ec_key_simple_generate_key(EC_KEY *eckey)
+#else
+int ec_key_simple_generate_key(EC_KEY *eckey)
+#endif
+#endif /* CYCLES_ENABLE */
 {
     int ok = 0;
     BN_CTX *ctx = NULL;

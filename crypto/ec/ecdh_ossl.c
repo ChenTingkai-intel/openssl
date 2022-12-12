@@ -18,6 +18,7 @@
 #include <openssl/objects.h>
 #include <openssl/ec.h>
 #include "ec_local.h"
+#include <cpu_cycles.h>
 
 int ossl_ecdh_compute_key(unsigned char **psec, size_t *pseclen,
                           const EC_POINT *pub_key, const EC_KEY *ecdh)
@@ -35,8 +36,30 @@ int ossl_ecdh_compute_key(unsigned char **psec, size_t *pseclen,
  *  - ECKAS-DH1
  *  - ECSVDP-DH
  */
+#ifdef CYCLES_ENABLE
+int tmp_ecdh_simple_compute_key(unsigned char **pout, size_t *poutlen,
+                            const EC_POINT *pub_key, const EC_KEY *ecdh);
+
 int ecdh_simple_compute_key(unsigned char **pout, size_t *poutlen,
                             const EC_POINT *pub_key, const EC_KEY *ecdh)
+{
+    int ret;
+
+    CYCLES_END_PRINTF("enter compute_key");
+    CYCLES_SET_FLAG("COMPUTEKEY");
+    CYCLES_START();
+    ret = tmp_ecdh_simple_compute_key(pout, poutlen, pub_key, ecdh);
+    CYCLES_END_PRINTF("compute_key complete");
+    CYCLES_START();
+    return ret;
+}
+
+int tmp_ecdh_simple_compute_key(unsigned char **pout, size_t *poutlen,
+                            const EC_POINT *pub_key, const EC_KEY *ecdh)
+#else
+int ecdh_simple_compute_key(unsigned char **pout, size_t *poutlen,
+                            const EC_POINT *pub_key, const EC_KEY *ecdh)
+#endif /* CYCLES_ENABLE */
 {
     BN_CTX *ctx;
     EC_POINT *tmp = NULL;
